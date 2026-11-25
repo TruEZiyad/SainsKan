@@ -193,6 +193,37 @@
   .toast.good{border-left-color:var(--green)}
   .toast.warn{border-left-color:var(--amber)}
   @keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+  /* Login & guru */
+  .login-page{min-height:100vh;display:grid;place-items:center;padding:18px}
+  .login-card{
+    width:min(880px,100%);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    border:1px solid var(--line);border-radius:24px;overflow:hidden;background:var(--panel);box-shadow:var(--shadow)
+  }
+  .login-art{
+    padding:30px;color:#fff;background:linear-gradient(150deg,#1d4ed8,#7c3aed);
+    display:flex;flex-direction:column;justify-content:space-between;gap:18px
+  }
+  .login-art h1{font-size:clamp(26px,4vw,38px);margin:10px 0 6px;letter-spacing:-.035em}
+  .login-art p{opacity:.9;font-size:14px;margin:0}
+  .login-art .orb{font-size:82px;line-height:1;text-align:center;filter:drop-shadow(0 12px 22px rgba(0,0,0,.3))}
+  .login-form{padding:30px;display:grid;align-content:center;gap:14px}
+  .login-form h2{margin:0;font-size:22px}
+  .field{display:grid;gap:6px}
+  .field label{font-size:12px;font-weight:750;color:var(--muted)}
+  .field input{
+    width:100%;padding:12px 13px;border-radius:12px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);font-size:14px
+  }
+  .error{color:var(--red);font-size:12px;font-weight:700;min-height:17px}
+  .hint{font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+  table{border-collapse:collapse;width:100%;font-size:13px;min-width:640px}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);background:var(--panel2)}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--panel2)}
+  .role-pill{font-size:10px;font-weight:800;padding:4px 8px;border-radius:999px;background:color-mix(in srgb,var(--blue) 16%,var(--panel2));color:var(--blue)}
+  @media (max-width:640px){.login-card{grid-template-columns:1fr}.login-art{padding:22px}.login-art .orb{font-size:56px}.login-form{padding:22px}}
   @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
   @media (max-width:980px){
     .layout{grid-template-columns:1fr}
@@ -218,12 +249,15 @@
 <body>
 <div id="app" class="app"></div>
 <div id="toasts" class="toast-host" aria-live="polite"></div>
+<script src="./users.js"></script>
 <script>
 /* ============================================================
-   SainsKan — single file prototype. No backend, no login, no CDN.
+   SainsKan — prototipe lokal. Tanpa backend, tanpa CDN.
+   Akun dibaca dari users.js (file terpisah).
    ============================================================ */
-const STORAGE_KEY = 'sainskan.progress.v1';
-const SCHEMA = 1;
+const STORAGE_KEY = 'sainskan.progress.v2';
+const LEGACY_KEY = 'sainskan.progress.v1';
+const SCHEMA = 2;
 const G = 9.8;
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -328,54 +362,151 @@ const ACHIEVEMENTS = [
   {id:'master_sains',nama:'Master Sains',deskripsi:'Selesaikan 12 materi',icon:'🏆',syaratPencapaian:{type:'materi',value:12}}
 ];
 
-const DEMO = [
-  {namaAlias:'Nebula',xp:780},{namaAlias:'Graviton',xp:620},{namaAlias:'Bunsen',xp:455},
-  {namaAlias:'Darwin',xp:310},{namaAlias:'Lensa',xp:180}
+const BASE_ACCOUNTS = Array.isArray(window.SAINSKAN_USERS) ? window.SAINSKAN_USERS.slice() : [];
+/* Bootstrap sekali saat localStorage kosong. Setelah itu SELURUH akun
+   (guru + siswa) dibaca dari localStorage (db.accounts), bukan dari file. */
+const DEFAULT_GURU = {username:'Guru Sains',password:'123',role:'guru',displayName:'Guru Sains',custom:true};
+const DEFAULT_SISWA = [
+  {username:'Komet',password:'123',role:'siswa',displayName:'Komet',custom:true,
+   seed:{xp:0,totalPoin:0,materiSelesai:[],streak:0,badge:[]}},
+  {username:'Neutron',password:'123',role:'siswa',displayName:'Neutron',custom:true,
+   seed:{xp:520,totalPoin:495,materiSelesai:['f1','f2','f3','k1','k2'],streak:2,badge:['pemula','fisikawan','akademi_sempurna']}},
+  {username:'Orbit',password:'123',role:'siswa',displayName:'Orbit',custom:true,
+   seed:{xp:390,totalPoin:365,materiSelesai:['f1','k1','k2','k3','a1'],streak:3,badge:['pemula','kimiawan','disiplin']}},
+  {username:'Awan',password:'123',role:'siswa',displayName:'Awan',custom:true,
+   seed:{xp:260,totalPoin:235,materiSelesai:['b1','b2','a1'],streak:1,badge:['pemula','biolog']}},
+  {username:'Raksa',password:'123',role:'siswa',displayName:'Raksa',custom:true,
+   seed:{xp:145,totalPoin:125,materiSelesai:['f1','k1'],streak:0,badge:['pemula']}},
+  {username:'Supernova',password:'123',role:'siswa',displayName:'Supernova',custom:true,
+   seed:{xp:80,totalPoin:60,materiSelesai:['a1'],streak:1,badge:['pemula']}}
 ];
-const ALIAS_PRESET = ['Komet','Neutron','Orbit','Awan','Raksa','Supernova'];
+let ACCOUNTS = BASE_ACCOUNTS.slice();
 const KATEGORI = ['Fisika','Kimia','Biologi','Astronomi'];
 const KAT_ICON = {Fisika:'⚛️',Kimia:'🧪',Biologi:'🌿',Astronomi:'🪐'};
 const KAT_COLOR = {Fisika:'',Kimia:'green',Biologi:'violet',Astronomi:'amber'};
 
-function defaultState(){
+function defaultStateFor(username){
+  const akun = ACCOUNTS.find(u=>u.username===username);
+  const seed = akun?.seed || {};
+  const selesai = Array.isArray(seed.materiSelesai) ? seed.materiSelesai.filter(id=>MATERI.some(m=>m.id===id)) : [];
+  const progres = {};
+  selesai.forEach(id=>{
+    progres[id] = {pemainId:username,materiId:id,skor:100,status:'selesai',tanggalPenyelesaian:todayStr(),
+                   awarded:true,attempts:1,jawaban:{benar:3,total:3}};
+  });
+  const xp = Number(seed.xp)||0;
   return {
-    version:SCHEMA, theme:'dark', alias:'Komet',
-    player:{id:'pemain-lokal',namaAlias:'Komet',xp:0,level:1,totalPoin:0,badge:[],materiSelesai:[]},
-    progres:{}, daily:{tanggal:'',selesai:false,diambilAt:'',streak:0,terakhir:''}, simulasiDicoba:[]
+    version:SCHEMA, theme:'dark', alias:username,
+    player:{id:'pemain-'+username,namaAlias:username,xp,level:levelOf(xp),
+            totalPoin:Number(seed.totalPoin)||0,
+            badge:Array.isArray(seed.badge)?seed.badge:[],materiSelesai:selesai.slice()},
+    progres, daily:{tanggal:'',selesai:false,diambilAt:'',streak:Number(seed.streak)||0,terakhir:''},
+    simulasiDicoba:[]
   };
 }
-function loadState(){
+function loadDB(){
+  const kosong = {version:SCHEMA,session:null,progress:{},accounts:[]};
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return defaultState();
-    const s = JSON.parse(raw);
-    if(!s || s.version !== SCHEMA || !s.player || !s.progres) throw new Error('skema');
-    const d = defaultState();
-    s.theme = ['dark','light'].includes(s.theme) ? s.theme : d.theme;
-    s.alias = ALIAS_PRESET.includes(s.alias) ? s.alias : d.alias;
-    s.player.badge = Array.isArray(s.player.badge) ? s.player.badge : [];
-    s.player.materiSelesai = Array.isArray(s.player.materiSelesai) ? s.player.materiSelesai : [];
-    s.simulasiDicoba = Array.isArray(s.simulasiDicoba) ? s.simulasiDicoba : [];
-    s.daily = Object.assign({}, d.daily, s.daily || {});
-    s.player.level = Math.floor(Number(s.player.xp || 0)/100)+1;
-    return s;
+    let db = raw ? JSON.parse(raw) : null;
+    if(!db || db.version!==SCHEMA || typeof db.progress!=='object') db = kosong;
+    const tersimpan = Array.isArray(db.accounts) ? db.accounts : [];
+    const tambahan = tersimpan
+      .filter(u=>u && ['guru','siswa'].includes(u.role) && typeof u.username==='string')
+      .map(u=>Object.assign({},u,{username:u.username.trim(),password:'123',custom:true,
+        displayName:u.displayName||u.username.trim()}))
+      .filter(u=>u.username && !BASE_ACCOUNTS.some(b=>b.username.toLowerCase()===u.username.toLowerCase()));
+    const punya = n=>tambahan.some(u=>u.username.toLowerCase()===n.toLowerCase());
+    [DEFAULT_GURU, ...DEFAULT_SISWA].forEach(u=>{ if(!punya(u.username)) tambahan.push(Object.assign({},u)); });
+    ACCOUNTS = BASE_ACCOUNTS.concat(tambahan);
+    db.accounts = ACCOUNTS.filter(u=>u.custom);
+    if(!raw){
+      try{
+        const lama = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null');
+        if(lama?.player?.namaAlias){
+          const name = lama.player.namaAlias;
+          db.progress[name] = Object.assign({}, lama, {version:SCHEMA,alias:name,
+            player:Object.assign({},lama.player,{namaAlias:name})});
+        }
+      }catch(e){}
+    }
+    ACCOUNTS.filter(u=>u.role==='siswa').forEach(u=>{
+      const s = db.progress[u.username];
+      if(!s || !s.player || !s.progres){ db.progress[u.username] = defaultStateFor(u.username); return; }
+      s.alias = u.username; s.player.namaAlias = u.username;
+      s.player.badge = Array.isArray(s.player.badge)?s.player.badge:[];
+      s.player.materiSelesai = Array.isArray(s.player.materiSelesai)?s.player.materiSelesai:[];
+      s.simulasiDicoba = Array.isArray(s.simulasiDicoba)?s.simulasiDicoba:[];
+      s.daily = Object.assign({},defaultStateFor(u.username).daily,s.daily||{});
+      s.player.level = levelOf(Number(s.player.xp)||0);
+      s.theme = ['dark','light'].includes(s.theme)?s.theme:'dark';
+    });
+    if(db.session && !ACCOUNTS.some(u=>u.username===db.session)) db.session = null;
+    return db;
   }catch(e){
-    queueMicrotask(()=>showToast('Data progres tidak valid — dimulai dari awal.','warn'));
-    return defaultState();
+    queueMicrotask(()=>showToast('Data akun tidak valid — dimulai dari awal.','warn'));
+    return kosong;
   }
 }
-let state = loadState();
+let db = loadDB();
+/* Tulis hasil inisialisasi (termasuk akun siswa bootstrap) ke localStorage
+   agar seluruh data login siswa benar-benar tersimpan di perangkat. */
+saveDB();
+let state = db.session ? (db.progress[db.session] || defaultStateFor(db.session)) : defaultStateFor('Komet');
 const ui = {
-  filter:'Semua', quiz:null, modal:false,
+  filter:'Semua', quiz:null, modal:false, guruDetail:null, guruAdd:false, guruAddNama:'', guruAddError:'', guruSort:'xp', guruQuery:'', loginError:'',
   sim:{tab:'gravitasi',grav:{massa:2,tinggi:20,t:0,running:false,done:false},
        solar:{years:0,speed:1,playing:true,selected:3,positions:[]},
        circ:{mode:'seri',v:12,r1:2,r2:4}}
 };
 let cleanups = [];
 
-function save(){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function currentUser(){ return ACCOUNTS.find(u=>u.username===db.session) || null; }
+function saveDB(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
   catch(e){ showToast('Penyimpanan penuh/diblokir; progres hanya tersimpan di memori.','warn'); }
+}
+function save(){
+  if(state?.alias) db.progress[state.alias] = state;
+  saveDB();
+}
+function doLogin(){
+  const nameEl = document.getElementById('loginUser');
+  const passEl = document.getElementById('loginPass');
+  const username = (nameEl?.value||'').trim(), password = passEl?.value||'';
+  const akun = ACCOUNTS.find(a=>a.username.toLowerCase()===username.toLowerCase() && a.password===password);
+  if(!akun){
+    ui.loginError = 'Username atau password salah. Gunakan akun demo di bawah dan password 123.';
+    render(); return;
+  }
+  db.session = akun.username;
+  if(akun.role==='siswa') db.progress[akun.username] = db.progress[akun.username] || defaultStateFor(akun.username);
+  state = db.progress[akun.username] || state;
+  state.theme = state.theme || 'dark';
+  ui.loginError = ''; ui.quiz = null; ui.guruDetail = null;
+  saveDB();
+  go(akun.role==='guru' ? '#/guru' : '#/dashboard');
+  showToast('Selamat datang, ' + akun.displayName + '!','good');
+}
+function tambahSiswa(){
+  const input = document.getElementById('namaSiswaBaru');
+  const nama = (input?.value||'').trim().replace(/\s+/g,' ');
+  ui.guruAddNama = nama;
+  if(!/^[\p{L}\p{N} _-]{3,24}$/u.test(nama)){
+    ui.guruAddError = 'Gunakan 3–24 karakter: huruf, angka, spasi, tanda hubung, atau garis bawah.';
+    render(); document.getElementById('namaSiswaBaru')?.focus(); return;
+  }
+  if(ACCOUNTS.some(a=>a.username.toLowerCase()===nama.toLowerCase())){
+    ui.guruAddError = 'Username "' + nama + '" sudah digunakan. Pilih nama akun lain.';
+    render(); document.getElementById('namaSiswaBaru')?.focus(); return;
+  }
+  const akun = {username:nama,password:'123',role:'siswa',displayName:nama,custom:true};
+  ACCOUNTS.push(akun);
+  db.accounts = ACCOUNTS.filter(u=>u.custom);
+  db.progress[nama] = defaultStateFor(nama);
+  ui.guruAdd = false; ui.guruAddNama = ''; ui.guruAddError = ''; ui.guruQuery = '';
+  saveDB(); render();
+  showToast('Siswa "' + nama + '" ditambahkan. Progres dimulai dari 0.','good');
 }
 function showToast(msg, kind=''){
   const host = document.getElementById('toasts'); if(!host) return;
@@ -525,13 +656,12 @@ function shell(active, content){
       <div class="brand-mark" aria-hidden="true">⚛</div>
       <div><div class="brand-name">SainsKan</div><div class="brand-tag">Belajar sains jadi petualangan</div></div>
     </div>
+    <span class="chip" title="Akun siswa yang sedang masuk">👤 ${esc(state.alias)}</span>
     <span class="chip" title="Level saat ini">⭐ Level <b>${p.level}</b></span>
     <span class="chip" title="Total experience point">XP <b>${rupiah(p.xp)}</b></span>
-    <select class="chip" data-input="alias" aria-label="Pilih alias pemain">
-      ${ALIAS_PRESET.map(a=>`<option value="${esc(a)}" ${a===state.alias?'selected':''}>👤 ${esc(a)}</option>`).join('')}
-    </select>
     <button class="icon-btn" data-action="theme" aria-label="Ganti tema" title="Ganti tema">${state.theme==='dark'?'☀️ Light':'🌙 Dark'}</button>
     <button class="btn small danger" data-action="reset-open">Reset</button>
+    <button class="btn small" data-action="logout">Keluar</button>
   </header>
   <div class="layout">
     <nav class="nav" aria-label="Navigasi utama">
@@ -546,6 +676,127 @@ function shell(active, content){
     <main class="main">${content}</main>
   </div>
   ${ui.modal ? modalHTML() : ''}`;
+}
+function teacherShell(content){
+  const u = currentUser();
+  return `
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">⚛</div>
+      <div><div class="brand-name">SainsKan · Panel Guru</div><div class="brand-tag">Pantau progres belajar siswa</div></div>
+    </div>
+    <span class="chip">👤 ${esc(u?.displayName||'Guru')}</span>
+    <span class="role-pill">AKUN GURU</span>
+    <button class="icon-btn" data-action="theme" aria-label="Ganti tema" title="Ganti tema">${state.theme==='dark'?'☀️ Light':'🌙 Dark'}</button>
+    <button class="btn small" data-action="logout">Keluar</button>
+  </header>
+  <div class="layout">
+    <nav class="nav" aria-label="Navigasi guru">
+      <div class="nav-title">Menu guru</div>
+      <a href="#/guru" class="active" data-action="nav" data-view="guru"><span class="ico">📊</span>Dashboard Guru</a>
+    </nav>
+    <main class="main">${content}</main>
+  </div>
+  ${ui.guruDetail ? guruDetailHTML() : ''}
+  ${ui.guruAdd ? guruAddHTML() : ''}`;
+}
+function renderLogin(){
+  const daftar = ACCOUNTS.map(a=>`<span class="tag">${esc(a.username)} · ${a.role==='guru'?'guru':'siswa'}</span>`).join('');
+  return `<div class="login-page"><section class="login-card">
+    <div class="login-art">
+      <div><div class="eyebrow" style="color:#bfdbfe">Aplikasi edukasi sains</div>
+        <h1>Selamat datang di SainsKan</h1>
+        <p>Materi singkat, kuis interaktif, dan simulasi sains dalam satu petualangan.</p></div>
+      <div class="orb" aria-hidden="true">🪐⚛️🧪</div>
+      <p style="font-size:12px;opacity:.8">Masuk untuk melanjutkan. Akun guru melihat progres kelas; akun siswa belajar dan mengerjakan kuis.</p>
+    </div>
+    <form class="login-form" id="loginForm" autocomplete="off">
+      <div><h2>Masuk akun</h2><p class="muted small" style="margin:4px 0 0">Gunakan username sesuai nama akun demo dan password <b>123</b>.</p></div>
+      <div class="field"><label for="loginUser">Username</label><input id="loginUser" name="username" list="daftarAkun" placeholder="Contoh: Komet" required /></div>
+      <datalist id="daftarAkun">${ACCOUNTS.map(a=>`<option value="${esc(a.username)}"></option>`).join('')}</datalist>
+      <div class="field"><label for="loginPass">Password</label><input id="loginPass" name="password" type="password" placeholder="123" required /></div>
+      <div class="error" role="alert">${esc(ui.loginError)}</div>
+      <button class="btn primary" type="submit">Masuk ke SainsKan</button>
+      <div class="hint"><b>Akun demo:</b><div class="tags" style="margin-top:7px">${daftar}</div><div style="margin-top:7px">Password untuk semua akun: <b>123</b>. Data akun disimpan di <code>users.js</code>.</div></div>
+    </form>
+  </section></div>`;
+}
+function studentStates(){
+  return ACCOUNTS.filter(u=>u.role==='siswa').map(u=>({u,s:db.progress[u.username]||defaultStateFor(u.username)}));
+}
+function renderGuru(){
+  let rows = studentStates();
+  const q = ui.guruQuery.trim().toLowerCase();
+  if(q) rows = rows.filter(r=>r.u.username.toLowerCase().includes(q));
+  const key = r => ui.guruSort==='nama' ? r.u.username.localeCompare(r.u.username)
+    : ui.guruSort==='poin' ? r.s.player.totalPoin : r.s.player.xp;
+  rows.sort((a,b)=> ui.guruSort==='nama' ? key(a) : key(b)-key(a));
+  const semua = studentStates();
+  const avg = semua.length ? Math.round(semua.reduce((n,r)=>n+r.s.player.xp,0)/semua.length) : 0;
+  const streakMax = semua.reduce((n,r)=>Math.max(n,r.s.daily.streak||0),0);
+  const content = `<div class="page-head"><div><div class="eyebrow">Panel pendamping</div><h1>Dashboard Guru</h1><p>Progres seluruh siswa pada perangkat ini. Data diperbarui setiap siswa menyelesaikan aktivitas.</p></div><button class="btn primary" data-action="guru-add-open">＋ Tambah siswa</button></div>
+    <div class="grid g3" style="margin-bottom:14px">
+      <article class="card">${statCard('👥','Jumlah siswa',semua.length)}</article>
+      <article class="card">${statCard('⭐','Rata-rata XP',rupiah(avg))}</article>
+      <article class="card">${statCard('🔥','Streak tertinggi',streakMax+' hari')}</article>
+    </div>
+    <article class="card">
+      <h2>Ringkasan progres siswa</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 12px">
+        <input id="guruSearch" data-input="guru-search" value="${esc(ui.guruQuery)}" placeholder="Cari nama siswa…" aria-label="Cari siswa" style="flex:1;min-width:180px;padding:9px 11px;border-radius:11px;border:1px solid var(--line);background:var(--panel2);color:var(--text)" />
+        ${[['xp','XP tertinggi'],['poin','Poin tertinggi'],['nama','Nama A–Z']].map(([k,l])=>`<button class="filter ${ui.guruSort===k?'active':''}" data-action="guru-sort" data-sort="${k}">${l}</button>`).join('')}
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Siswa</th><th>Poin</th><th>XP</th><th>Level</th><th>Materi selesai</th><th>Streak harian</th><th>Badge</th><th>Aksi</th></tr></thead>
+        <tbody>${rows.map(r=>`<tr>
+          <td><b>${esc(r.u.displayName||r.u.username)}</b></td>
+          <td>${rupiah(r.s.player.totalPoin)}</td>
+          <td>${rupiah(r.s.player.xp)}</td>
+          <td>${r.s.player.level}</td>
+          <td>${r.s.player.materiSelesai.length}/12</td>
+          <td>${r.s.daily.streak||0} hari</td>
+          <td>${r.s.player.badge.length} badge</td>
+          <td><button class="btn small" data-action="guru-detail" data-user="${esc(r.u.username)}">Detail</button></td>
+        </tr>`).join('')}${rows.length?'':'<tr><td colspan="8" class="muted">Tidak ada siswa yang cocok.</td></tr>'}</tbody>
+      </table></div>
+      <div class="note">Guru tidak mengerjakan kuis atau simulasi. Fokus panel ini adalah monitoring: poin, XP, materi selesai, streak, dan detail badge siswa.</div>
+    </article>`;
+  return teacherShell(content);
+}
+function guruDetailHTML(){
+  const u = ACCOUNTS.find(a=>a.username===ui.guruDetail && a.role==='siswa');
+  if(!u) return '';
+  const s = db.progress[u.username] || defaultStateFor(u.username);
+  const badges = s.player.badge.map(id=>{const a=ACHIEVEMENTS.find(x=>x.id===id);return a?`<span class="tag done">${a.icon} ${esc(a.nama)}</span>`:''}).join('') || '<span class="tag">Belum ada badge</span>';
+  return `<div class="modal-bg" data-action="guru-detail-close" role="presentation">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Detail siswa" data-stop="1" style="width:min(540px,100%)">
+      <h2>Detail ${esc(u.displayName||u.username)}</h2>
+      <p>Level ${s.player.level} · ${rupiah(s.player.totalPoin)} poin · ${rupiah(s.player.xp)} XP · streak ${s.daily.streak||0} hari</p>
+      <h3 style="font-size:14px;margin:0 0 8px">Progress per kategori</h3>
+      <div class="stack">${KATEGORI.map(k=>{
+        const ids=MATERI.filter(m=>m.kategori===k).map(m=>m.id), done=ids.filter(id=>s.player.materiSelesai.includes(id)).length;
+        return `<div><div class="small" style="display:flex;justify-content:space-between"><span>${KAT_ICON[k]} ${k}</span><b>${done}/3</b></div><div class="bar ${KAT_COLOR[k]}"><i style="width:${pct(done,3)}%"></i></div></div>`;
+      }).join('')}</div>
+      <h3 style="font-size:14px;margin:14px 0 8px">Badge diraih</h3><div class="tags">${badges}</div>
+      <div class="modal-actions" style="margin-top:16px"><button class="btn" data-action="guru-detail-close">Tutup</button></div>
+    </div></div>`;
+}
+function guruAddHTML(){
+  return `<div class="modal-bg" data-action="guru-add-close" role="presentation">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="guru-add-title" data-stop="1">
+      <h2 id="guru-add-title">Tambah siswa baru</h2>
+      <p>Username akan dipakai sebagai nama akun. Password otomatis <b>123</b>. Progres siswa baru dimulai dari nol: 0 poin, 0 XP, level 1, 0 materi, 0 badge, streak 0.</p>
+      <div class="field">
+        <label for="namaSiswaBaru">Nama akun siswa</label>
+        <input id="namaSiswaBaru" value="${esc(ui.guruAddNama||'')}" placeholder="Contoh: Bintang" maxlength="24" />
+      </div>
+      <div class="error" role="alert" style="margin-top:8px">${esc(ui.guruAddError)}</div>
+      <div class="note">Gunakan nama panggilan/alias, bukan data pribadi. Akun baru disimpan di perangkat ini dan tetap ada setelah halaman dimuat ulang.</div>
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn" data-action="guru-add-close">Batal</button>
+        <button class="btn primary" data-action="guru-add-submit">Tambah siswa</button>
+      </div>
+    </div></div>`;
 }
 function modalHTML(){
   return `<div class="modal-bg" data-action="reset-cancel" role="presentation">
@@ -715,14 +966,14 @@ function renderPencapaian(){
   return shell('pencapaian',content);
 }
 function renderLeaderboard(){
-  const rows = [...DEMO.map(d=>({...d,demo:true})),{namaAlias:state.player.namaAlias,xp:state.player.xp,demo:false,me:true}]
+  const rows = studentStates().map(r=>({namaAlias:r.u.username,xp:r.s.player.xp,me:r.u.username===state.alias}))
     .sort((a,b)=>b.xp-a.xp || a.namaAlias.localeCompare(b.namaAlias));
-  const content = `<div class="page-head"><div><div class="eyebrow">Papan peringkat perangkat</div><h1>Leaderboard Lokal</h1><p>Perbandingan dengan profil demo nonpribadi. Tidak ada data yang dikirim ke internet.</p></div></div>
+  const content = `<div class="page-head"><div><div class="eyebrow">Papan peringkat perangkat</div><h1>Leaderboard Lokal</h1><p>Perbandingan XP antar akun siswa demo pada perangkat ini. Tidak ada data yang dikirim ke internet.</p></div></div>
     <article class="card" style="max-width:760px;margin:auto">
       <div class="stack">${rows.map((r,i)=>`<div class="leader ${r.me?'me':''}">
-        <div class="rank">${i+1}</div><div class="who"><b>${esc(r.namaAlias)} ${r.me?'(kamu)':''}</b><span>${r.demo?'Profil demo':'Pemain lokal'} · Level ${levelOf(r.xp)}</span></div>
+        <div class="rank">${i+1}</div><div class="who"><b>${esc(r.namaAlias)} ${r.me?'(kamu)':''}</b><span>Akun siswa · Level ${levelOf(r.xp)}</span></div>
         <span class="chip">⭐ ${rupiah(r.xp)} XP</span></div>`).join('')}</div>
-      <div class="note">Skor demo adalah data contoh. Peringkat dihitung ulang dari XP pemain lokal setiap kali halaman dibuka.</div>
+      <div class="note">Peringkat dihitung ulang dari XP tiap akun siswa. Akun yang lain memakai data contoh sampai siswa tersebut digunakan.</div>
     </article>`;
   return shell('leaderboard',content);
 }
@@ -786,9 +1037,24 @@ function renderSimulasi(){
 }
 function render(){
   cleanups.forEach(fn=>{try{fn()}catch(e){}}); cleanups = [];
-  document.documentElement.dataset.theme = state.theme;
+  const user = currentUser();
   const hash = (location.hash||'#/dashboard').replace(/^#\/?/,'');
   const [view,param] = hash.split('/');
+  if(!user){
+    document.documentElement.dataset.theme = 'dark';
+    document.getElementById('app').innerHTML = renderLogin();
+    window.scrollTo({top:0,behavior:'auto'});
+    return;
+  }
+  if(user.role==='guru'){
+    state = db.progress[user.username] || state;
+    document.documentElement.dataset.theme = state.theme;
+    document.getElementById('app').innerHTML = renderGuru();
+    window.scrollTo({top:0,behavior:'auto'});
+    return;
+  }
+  state = db.progress[user.username] || defaultStateFor(user.username);
+  document.documentElement.dataset.theme = state.theme;
   let html;
   switch(view){
     case 'materi': html = param ? renderDetail(param) : renderMateri(); break;
@@ -1016,7 +1282,16 @@ document.addEventListener('click',(e)=>{
   const el=e.target.closest('[data-action]'); if(!el) return;
   const a=el.dataset.action;
   if(a==='reset-cancel' && el.classList.contains('modal-bg') && e.target.closest('.modal')) return;
+  if(a==='guru-detail-close' && el.classList.contains('modal-bg') && e.target.closest('.modal')) return;
+  if(a==='guru-add-close' && el.classList.contains('modal-bg') && e.target.closest('.modal')) return;
   switch(a){
+    case 'logout': db.session=null;ui.quiz=null;ui.modal=false;ui.guruDetail=null;ui.guruAdd=false;saveDB();go('#/login');break;
+    case 'guru-detail': ui.guruDetail=el.dataset.user;render();break;
+    case 'guru-detail-close': ui.guruDetail=null;render();break;
+    case 'guru-add-open': ui.guruAdd=true;ui.guruAddNama='';ui.guruAddError='';render();document.getElementById('namaSiswaBaru')?.focus();break;
+    case 'guru-add-close': ui.guruAdd=false;ui.guruAddError='';render();break;
+    case 'guru-add-submit': tambahSiswa();break;
+    case 'guru-sort': ui.guruSort=el.dataset.sort;render();break;
     case 'nav': go('#/'+el.dataset.view); break;
     case 'filter': ui.filter=el.dataset.kat; render(); break;
     case 'filter-kat': ui.filter=el.dataset.kat; go('#/materi'); break;
@@ -1040,7 +1315,7 @@ document.addEventListener('click',(e)=>{
     case 'reset-cancel': ui.modal=false; render(); break;
     case 'reset-confirm': {
       const theme=state.theme,alias=state.alias;
-      state=defaultState();state.theme=theme;state.alias=alias;state.player.namaAlias=alias;
+      state=defaultStateFor(alias);state.theme=theme;state.alias=alias;state.player.namaAlias=alias;
       ui.modal=false;ui.quiz=null;ui.sim.grav={massa:2,tinggi:20,t:0,running:false,done:false};
       ui.sim.solar={years:0,speed:1,playing:true,selected:3,positions:[]};
       ui.sim.circ={mode:'seri',v:12,r1:2,r2:4};
@@ -1069,17 +1344,22 @@ document.addEventListener('input',(e)=>{
     case 'circ-v': ui.sim.circ.v=Number(v);setText('circVVal',v);updateCircuitReadouts();markSim('rangkaian');break;
     case 'circ-r1': ui.sim.circ.r1=Number(v);setText('circR1Val',v);updateCircuitReadouts();markSim('rangkaian');break;
     case 'circ-r2': ui.sim.circ.r2=Number(v);setText('circR2Val',v);updateCircuitReadouts();markSim('rangkaian');break;
+    case 'guru-search': ui.guruQuery=v;render();
+      document.getElementById('guruSearch')?.focus();break;
   }
 });
-document.addEventListener('change',(e)=>{
-  const el=e.target;
-  if(el?.dataset?.input==='alias' && ALIAS_PRESET.includes(el.value)){
-    state.alias=el.value;state.player.namaAlias=el.value;save();render();
+document.addEventListener('submit',(e)=>{
+  if(e.target.id==='loginForm'){
+    e.preventDefault();
+    doLogin();
   }
 });
 document.addEventListener('keydown',(e)=>{
   if((e.key==='Enter'||e.key===' ') && e.target.matches('[data-action="buka-materi"]')){
     e.preventDefault();go('#/materi/'+e.target.dataset.id);
+  }
+  if(e.key==='Enter' && e.target.id==='namaSiswaBaru'){
+    e.preventDefault();tambahSiswa();
   }
 });
 window.addEventListener('hashchange',render);

@@ -1,15 +1,17 @@
 # SPEC — SainsKan
 
-**Versi:** 1.0 (MVP)  
+**Versi:** 1.1 (MVP + akun per peran)  
 **Tanggal:** 2026-11-25  
-**Status:** Siap diimplementasikan / prototype tersedia di `index.html`  
+**Status:** Siap diimplementasikan / prototype tersedia di `index.html`, `users.js`  
 **Penulis:** System Analyst & Software Engineer
+
+> **Perubahan dari v1.0:** ruang lingkup ditambah dengan login lokal per pengguna dan panel guru. **Seluruh akun (guru + siswa) disimpan di `localStorage`.** `users.js` sengaja dikosongkan. Autentikasi ini **hanya untuk prototype/demo lokal** dan tidak layak untuk produksi.
 
 ---
 
 ## 1. Tujuan
 
-SainsKan adalah aplikasi edukasi berbasis web yang membantu pelajar SMP/SMA memahami konsep sains dasar melalui materi singkat, kuis interaktif, umpan balik penjelasan, dan simulasi sederhana. Pendekatan gamifikasi (poin, XP, level, badge, progress bar, daily challenge, leaderboard lokal) digunakan untuk menjaga motivasi belajar tanpa memerlukan akun, backend, atau data pribadi.
+SainsKan adalah aplikasi edukasi berbasis web yang membantu pelajar SMP/SMA memahami konsep sains dasar melalui materi singkat, kuis interaktif, umpan balik penjelasan, dan simulasi sederhana. Pendekatan gamifikasi (poin, XP, level, badge, progress bar, daily challenge, leaderboard lokal) digunakan untuk menjaga motivasi belajar. Versi 1.1 menambahkan **akun lokal per peran**: siswa belajar, guru memantau progres seluruh siswa pada perangkat yang sama. Tidak ada backend dan tidak ada data pribadi yang dikirim keluar perangkat.
 
 Tujuan terukur MVP:
 
@@ -17,7 +19,10 @@ Tujuan terukur MVP:
 2. Menyediakan **36 soal kuis** pilihan ganda dengan penjelasan untuk jawaban benar **dan** salah.
 3. Memberikan umpan balik kuantitatif (poin, XP, level, badge) yang **tidak dapat diambil dua kali** untuk kuis yang sama.
 4. Menyediakan **3 simulasi interaktif** yang memakai rumus fisika/astronomi yang benar: jatuh bebas, orbit tata surya, dan hukum Ohm.
-5. Menyimpan seluruh progres di `localStorage` dan tetap konsisten setelah halaman dimuat ulang.
+5. Menyimpan seluruh progres **per akun siswa** di `localStorage` dan tetap konsisten setelah halaman dimuat ulang.
+6. Menyediakan login lokal dengan username per akun dan password `123`, memisahkan fitur siswa dan guru.
+7. Menyimpan **seluruh data login (guru + siswa)** — username, password, peran, dan data contoh progres siswa — di `localStorage`; `users.js` tidak berisi akun sama sekali.
+8. Menyediakan dashboard guru yang menampilkan poin, XP, level, jumlah materi selesai, streak harian, badge, dan detail per siswa.
 
 ---
 
@@ -27,9 +32,9 @@ Tujuan terukur MVP:
 |---|---|---|
 | Pelajar SMP | Usia ±12–15 tahun, pembelajaran konkret | Materi singkat, gambar, kuis, simulasi visual |
 | Pelajar SMA | Usia ±15–18 tahun, siap dengan model matematis | Penjelasan konsep, rumus, simulasi dengan parameter |
-| Guru pendamping | Memakai **satu perangkat yang sama** dengan pelajar | Dashboard ringkasan, leaderboard demo, tanpa login |
+| Akun guru | Pendamping pada **satu perangkat yang sama** | Melihat ringkasan & detail progres setiap siswa; tidak mengerjakan kuis |
 
-**Asumsi penting:** satu perangkat = satu profil pemain lokal. Tidak ada multi-akun, tidak ada login, tidak ada sinkronisasi. Identitas ditampilkan sebagai **alias acak/preset nonpribadi** (mis. `Komet`, `Neutron`), bukan nama asli.
+**Asumsi penting:** satu perangkat menyimpan beberapa akun demo lokal (1 guru + 6 siswa), tetapi hanya **satu sesi aktif** pada satu waktu. Tidak ada sync antar-perangkat. Username memakai **nama akun nonpribadi** (mis. `Komet`, `Neutron`, `Guru Sains`), bukan nama asli pelajar. Sesuai permintaan, password semua akun adalah `123`; ini bukan pengamanan produksi.
 
 ---
 
@@ -131,7 +136,29 @@ Menampilkan: level & XP, total poin, jumlah materi per kategori, badge terakhir,
 
 ### 3.12 Penyimpanan
 
-`localStorage` dengan key `sainskan.progress.v1`, versi skema `1`. Ditulis setiap kali state berubah. Jika data korup/versi berbeda → fallback ke state default + toast peringatan; aplikasi tetap berjalan.
+`localStorage` dengan key `sainskan.progress.v2`, versi skema `2`, berisi `{ session, accounts: [akunGuru, ...akunSiswa], progress: { [username]: stateSiswa } }`. `accounts` memuat **seluruh akun** (guru + siswa bawaan + hasil penambahan guru) beserta `seed` progres contoh untuk siswa. Ditulis saat inisialisasi dan setiap kali state berubah. Akun guru juga ikut dibootstrap di sini; `users.js` tidak dipakai sebagai sumber akun. Data lama `sainskan.progress.v1` dimigrasikan sekali ke akun `Komet`. Jika data korup/versi berbeda → fallback ke state default + toast peringatan; aplikasi tetap berjalan.
+
+### 3.13 Login lokal & perbedaan peran
+
+- Halaman login tampil sebelum aplikasi jika belum ada sesi aktif.
+- Username: sesuai nama akun demo; password: `123` untuk semua akun.
+- **`users.js` sengaja kosong** (`window.SAINSKAN_USERS = []`), tetap dimuat via `<script src="./users.js"></script>` agar struktur file terpisah terjaga pada `file://` (fetch JSON diblokir CORS).
+- **Seluruh akun** — guru (`Guru Sains`), 6 siswa contoh (`Komet`, `Neutron`, `Orbit`, `Awan`, `Raksa`, `Supernova`), dan akun yang ditambahkan guru — disimpan di `localStorage` (`db.accounts`) beserta password `123`, peran, dan `seed` progres untuk siswa. Akun bawaan dipakai sekali sebagai bootstrap saat penyimpanan kosong, lalu dibaca dari `localStorage` pada load berikutnya.
+- Halaman login dan tabel guru membaca daftar dari `ACCOUNTS` yang berasal dari `db.accounts` (`localStorage`) + kemungkinan `users.js` jika suatu hari diisi ulang, sehingga akun tetap tersedia setelah reload.
+- Akun siswa → dashboard siswa, materi, kuis, simulasi, pencapaian, leaderboard.
+- Akun guru → panel guru saja; tidak melihat/mengerjakan kuis, simulasi, atau leaderboard siswa.
+- Sesi tersimpan di `localStorage`; tombol Keluar menghapus sesi dan kembali ke login.
+- Kredensial salah menampilkan pesan kesalahan inline; tidak ada penguncian akun (prototype).
+
+### 3.14 Dashboard guru
+
+- Ringkasan: jumlah siswa, rata-rata XP, streak tertinggi. **Tidak menampilkan total materi selesai secara agregat.**
+- Tabel per siswa: nama, **poin**, **XP**, level, **jumlah materi selesai**, **streak harian**, jumlah badge, tombol Detail. Data materi per siswa tetap dipertahankan.
+- Kontrol: pencarian nama dan pengurutan (XP tertinggi / poin tertinggi / nama A–Z).
+- Modal detail siswa: progress bar 4 kategori, daftar badge, dan ringkasan level/poin/XP/streak.
+- Tombol **Tambah siswa** membuka form nama akun (3–24 karakter; huruf, angka, spasi, `-`, `_`), menolak nama duplikat, dan otomatis memberi password `123` serta peran `siswa`.
+- Akun baru langsung muncul di tabel, **jumlah siswa bertambah 1**, dan progresnya dicatat dari awal: `0 poin`, `0 XP`, `level 1`, `0/12 materi`, `0 badge`, `streak 0`.
+- Data berasal dari `db.progress[username]` yang diperbarui siswa saat mereka memakai perangkat; akun contoh yang belum dipakai menampilkan data contoh dari `seed` di `db.accounts` (`localStorage`).
 
 ---
 
@@ -145,23 +172,34 @@ Pemain  = { id, namaAlias, xp, level, totalPoin, badge: string[], materiSelesai:
 Progres = { pemainId, materiId, skor, status, tanggalPenyelesaian,
             awarded: boolean, attempts: number, jawaban: object }
 Achievement = { id, nama, deskripsi, icon, syaratPencapaian: { type, value?, kategori? } }
+Akun      = { username, password, role: 'guru' | 'siswa', displayName, seed?, custom? }
 ```
 
-State tersimpan:
+State tersimpan (`localStorage` `sainskan.progress.v2`):
 
 ```js
 {
-  version: 1,
-  theme: 'dark' | 'light',
-  alias: 'Komet',              // dari preset, bukan input bebas
-  player: Pemain,
-  progres: { [materiId]: Progres },
-  daily: { tanggal, selesai, diambilAt, streak, terakhir },
-  simulasiDicoba: ['gravitasi', 'tatasurya', 'rangkaian']
+  version: 2,
+  session: 'Komet' | 'Guru Sains' | null,
+  accounts: [ /* seluruh akun: guru + 6 siswa contoh + tambahan guru; custom: true, seed untuk siswa */ ],
+  progress: {
+    'Komet': {
+      version: 2,
+      theme: 'dark' | 'light',
+      alias: 'Komet',          // = username akun, bukan input bebas
+      player: Pemain,
+      progres: { [materiId]: Progres },
+      daily: { tanggal, selesai, diambilAt, streak, terakhir },
+      simulasiDicoba: ['gravitasi', 'tatasurya', 'rangkaian']
+    },
+    'Neutron': { /* struktur sama */ }
+  }
 }
 ```
 
-Relasi: `Kuis.materiId → Materi.id`; `Progres.pemainId → Pemain.id`; `Pemain.badge[] → Achievement.id`.
+File `users.js` memuat `window.SAINSKAN_USERS = []` — **sengaja kosong, tanpa akun guru maupun siswa**. Seluruh akun (guru `Guru Sains`, 6 siswa contoh, dan hasil menu **Tambah siswa**) disimpan di `db.accounts` pada `localStorage`, lengkap dengan `username`, `password: '123'`, `role`, `displayName`, `custom: true`, dan `seed` progres untuk siswa. Konstanta `DEFAULT_GURU` dan `DEFAULT_SISWA` di `index.html` hanya dipakai sekali untuk mengisi `localStorage` saat kosong; setelah itu semua akun dibaca dari penyimpanan lokal. Password plaintext disimpan sesuai permintaan prototype; **jangan dipakai untuk data nyata**.
+
+Relasi: `Kuis.materiId → Materi.id`; `Progres.pemainId → Akun.username`; `Pemain.badge[] → Achievement.id`; `Akun.username → db.progress[username]`.
 
 **Aturan integritas:**
 - `materiSelesai` dan `progres` keduanya dipakai; keduanya diperbarui bersamaan dalam satu transaksi `save()`.
@@ -174,9 +212,9 @@ Relasi: `Kuis.materiId → Materi.id`; `Progres.pemainId → Pemain.id`; `Pemain
 
 | Kode | Requirement |
 |---|---|
-| NFR-1 | **Single file.** Prototipe `index.html` berisi HTML + CSS + JS; dibuka langsung via `file://`, tanpa build, server, CDN, atau instalasi. |
-| NFR-2 | **Tanpa backend & tanpa login.** Tidak ada form kredensial, tidak ada fetch ke API eksternal. |
-| NFR-3 | **Privasi.** Tidak mengumpulkan nama, email, sekolah, atau data pribadi lain. Alias hanya dari preset. Tidak ada API key/token di kode. |
+| NFR-1 | **Tanpa instalasi.** `index.html` berisi HTML + CSS + JS dan dibuka langsung via `file://`; `users.js` (kosong) tetap dimuat via tag `<script>`. Tanpa build/server/CDN. |
+| NFR-2 | **Tanpa backend.** Login divalidasi lokal terhadap `db.accounts` di `localStorage` (guru + siswa); tidak ada fetch ke API eksternal, tidak ada API key/token. |
+| NFR-3 | **Privasi.** Username memakai nama akun demo nonpribadi; tidak mengumpulkan nama asli, email, sekolah, atau data pribadi lain. Password `123` hanya untuk demo. |
 | NFR-4 | **Akurasi sains.** Rumus dan penjelasan sesuai fisika/kimia/biologi/astronomi standar SMA; simplifikasi simulasi diberi label. |
 | NFR-5 | **Idempotensi.** Kuis yang sama tidak pernah memberikan poin/XP/badge dua kali; daily challenge sekali per tanggal lokal. |
 | NFR-6 | **Responsif.** Tata letak usable di desktop ≥1024px dan smartphone ≥360px; navigasi menjadi horizontal scroller di layar sempit. |
@@ -184,7 +222,9 @@ Relasi: `Kuis.materiId → Materi.id`; `Progres.pemainId → Pemain.id`; `Pemain
 | NFR-8 | **Animasi ringan.** Transisi ≤200ms; `prefers-reduced-motion` menonaktifkan animasi non-esensial; RAF dihentikan saat view/simulasi diganti. |
 | NFR-9 | **Keamanan.** Tidak ada `eval`, tidak ada `innerHTML` dari input pengguna; semua teks dinamis di-escape. |
 | NFR-10 | **Recovery.** localStorage korup ditangani dengan fallback aman, aplikasi tidak crash. |
-| NFR-11 | **Aksesibilitas.** Tombol memiliki label, fokus terlihat, teks alternatif pada gambar, kontrol keyboard untuk kuis. |
+| NFR-11 | **Aksesibilitas.** Tombol memiliki label, fokus terlihat, teks alternatif pada gambar, kontrol keyboard untuk kuis dan form login. |
+| NFR-12 | **Akun terpisah.** `users.js` sengaja kosong; **seluruh akun (guru + siswa) disimpan di `localStorage` (`db.accounts`)**. Daftar akun dikelola lewat bootstrap di `index.html` dan panel guru, bukan file kredensial. |
+| NFR-13 | **Isolasi peran.** Guru tidak melihat menu kuis/simulasi; siswa tidak melihat panel guru. Progres tiap akun tidak saling menimpa. |
 
 ---
 
@@ -199,31 +239,40 @@ Relasi: `Kuis.materiId → Materi.id`; `Progres.pemainId → Pemain.id`; `Pemain
 | Massa dianggap mempercepat jatuh | Miskonsepsi fisika | UI menampilkan `t = √(2h/g)` dan catatan massa tidak berpengaruh di ruang hampa |
 | Kuis dianggap "nilai akhir" | Attempt kedua menimpa skor terbaik | Simpan `Math.max(skorLama, skorBaru)` |
 | Konten SVG data URI terlalu panjang | File besar | Ilustrasi generator parametrik per kategori, bukan gambar mentah |
-| Satu perangkat dipakai bergantian | Progal tercampur | Dinyatakan sebagai batasan desain; alias dapat diganti tanpa menghapus progres |
+| Satu perangkat dipakai bergantian | Progres tercampur | Setiap akun punya `db.progress[username]` sendiri; hanya satu sesi aktif |
+| Password `123` plaintext | Tidak aman untuk produksi | Dinyatakan sebagai akun demo; **dilarang** dipakai dengan data nyata |
+| Pengguna melihat `localStorage` | Password demo terbaca | Sesuai desain prototype; tidak ada kerahasiaan yang dijanjikan. Gunakan backend+hashing jika produksi |
+| `fetch('users.json')` gagal pada `file://` | Akun tidak termuat | Semua akun dibaca dari `localStorage`; `users.js` tetap dimuat via `<script>` meski kosong |
+| Guru menambah akun baru | Browser tidak bisa menulis file | Simpan akun baru di `db.accounts` (`localStorage`) saat load; beri `custom: true` |
+| `localStorage` kosong saat pertama dibuka | Akun belum ada | `DEFAULT_GURU` + `DEFAULT_SISWA` dipakai sekali sebagai bootstrap, langsung ditulis ke `localStorage` oleh `saveDB()` saat inisialisasi |
+| Nama siswa duplikat | Progres dua akun tercampur | Validasi case-insensitive terhadap semua `ACCOUNTS` sebelum menambah |
 
 ---
 
 ## 7. Out of Scope (MVP)
 
-- Login, registrasi, multi-akun, atau profil personal.
-- Backend, database server, sync antar-perangkat, cloud save.
+- Login produksi, registrasi bebas, reset password, multi-akun sungguhan, atau profil personal.
+- Backend, database server, hashing password, sync antar-perangkat, cloud save.
+- Guru mengubah nilai siswa atau mengirim notifikasi/penilaian ke siswa.
 - Upload gambar/foto, kamera, mikrofon, atau suara.
 - Soal isian/uraian, esai, atau penilaian guru otomatis.
 - Simulasi 3D, kimia reaksi interaktif, atau laboratorium virtu­al penuh.
 - Notifikasi push, email,/widget, atau Pengaturan akun.
 - Analitik pihak ketiga, iklan, monetisasi.
 - Konten kurikulum lengkap lintas jenjang; MVP hanya 12 materi contoh.
-- Perubahan alias bebas (hanya preset) untuk mencegah data pribadi.
+- Perubahan username bebas (username = nama akun di `users.js`) untuk mencegah data pribadi.
 
 ---
 
 ## 8. Acceptance Criteria (dapat diperiksa manual)
 
-> Semua langkah dimulai dari kondisi **Reset progres** dan halaman dimuat ulang.
+> Kecuali AC-11, semua langkah dimulai setelah **login sebagai `Komet` / `123`**, kondisi progres awal (Reset progres), dan halaman dimuat ulang.
 
 ### AC-1 — Struktur & akses
 1. Buka `index.html` langsung di browser (tanpa server/install).
-2. **Expected:** aplikasi tampil, 4 kategori, 12 kartu materi, tidak ada permintaan jaringan, tidak ada kolom login.
+2. **Expected:** halaman login tampil, daftar 7 akun demo terlihat, tidak ada permintaan jaringan.
+3. Masuk sebagai `Komet` dengan password `123`.
+4. **Expected:** dashboard siswa tampil dengan 4 kategori, 12 kartu materi di halaman Materi, dan menu "Dashboard Guru" **tidak** tersedia.
 
 ### AC-2 — Kuis & penjelasan
 1. Buka Fisika → Gerak Jatuh Bebas → Mulai Kuis; jawab salah satu soal dengan sengaja.
@@ -259,9 +308,11 @@ Relasi: `Kuis.materiId → Materi.id`; `Progres.pemainId → Pemain.id`; `Pemain
 2. **Tata surya:** set 1 tahun/detik → Bumi menyelesaikan 1 orbit dalam ≈1 detik; Merkurius ≈0,24 detik; klik Bumi muncul info periode 1 tahun.
 3. **Rangkaian:** V=12, R1=2, R2=4, mode Seri → `R=6 Ω`, `I=2 A`, `V1=4 V`, `V2=8 V`. Ganti Paralel → `R=1,33 Ω`, `I=9 A`, `I1=6 A`, `I2=3 A`.
 
-### AC-8 — Persistensi
-1. Selesaikan 1 kuis, ubah tema ke light, muat ulang halaman.
-2. **Expected:** poin/XP/level/badge/progress/daily/alias/tema kembali seperti sebelum reload.
+### AC-8 — Persistensi & sesi
+1. Selesaikan 1 kuis sebagai `Komet`, ubah tema ke light, muat ulang halaman.
+2. **Expected:** tetap login sebagai `Komet`; poin/XP/level/badge/progress/daily/tema kembali seperti sebelum reload.
+3. Keluar, masuk sebagai `Neutron`, lalu masuk lagi sebagai `Komet`.
+4. **Expected:** progres `Komet` tidak berubah dan berbeda dari data contoh `Neutron` (520 XP).
 
 ### AC-9 — Reset
 1. Klik Reset → konfirmasi.
@@ -270,6 +321,40 @@ Relasi: `Kuis.materiId → Materi.id`; `Progres.pemainId → Pemain.id`; `Pemain
 ### AC-10 — Responsif & tema
 1. Buka di smartphone 360px dan desktop 1280px; toggle dark/light.
 2. **Expected:** tidak ada horizontal overflow, navigasi dapat diakses, teks terbaca di kedua tema, pilihan tersimpan setelah reload.
+
+### AC-11 — Login & pemisahan peran
+1. Buka `index.html` saat belum ada sesi. Coba username `Komet` + password `salah`.
+2. **Expected:** pesan "Username atau password salah" tampil, aplikasi tidak masuk.
+3. Masuk sebagai `Guru Sains` / `123`.
+4. **Expected:** halaman "Dashboard Guru" tampil; menu Materi, Kuis, Simulasi, dan Leaderboard **tidak ada**.
+5. Klik Keluar, masuk sebagai `Komet` / `123`.
+6. **Expected:** dashboard siswa tampil; menu "Dashboard Guru" tidak ada; header menampilkan username `Komet`.
+
+### AC-12 — Dashboard guru
+1. Masuk sebagai `Guru Sains` / `123` setelah siswa `Komet` menyelesaikan 1 kuis.
+2. **Expected:** ringkasan menampilkan 6 siswa, rata-rata XP, streak tertinggi, dan **tidak ada** kartu "Total materi selesai".
+3. Lihat baris `Komet`.
+3. **Expected:** Poin `65`, XP `90`, Level `1`, Materi selesai `1/12`, Streak `0 hari`, Badge `1 badge`.
+4. Klik tombol **Detail** pada `Neutron`.
+4. **Expected:** modal menampilkan `Detail Neutron`, 4 progress bar kategori, badge `Pemula`, `Fisikawan Cilik`, `Akademi Sempurna`, XP `520`, materi `5/12`.
+5. Ketik `orbit` di kolom cari; klik urutan "Poin tertinggi".
+6. **Expected:** hanya baris `Orbit` yang tampil; pengurutan kembali bekerja saat kolom cari dikosongkan.
+
+### AC-13 — Menambah siswa baru
+1. Masuk sebagai `Guru Sains` / `123`, klik tombol **＋ Tambah siswa**, isi `Bintang`, lalu kirim.
+2. **Expected:** kartu "Jumlah siswa" berubah dari `6` menjadi `7`; baris baru `Bintang` muncul dengan Poin `0`, XP `0`, Level `1`, Materi selesai `0/12`, Streak `0 hari`, Badge `0 badge`.
+3. Coba tambahkan nama `Bintang` lagi.
+4. **Expected:** pesan "Username sudah digunakan" tampil; jumlah siswa tetap `7`.
+5. Muat ulang halaman (tetap sebagai guru), lalu keluar dan lihat daftar akun di halaman login.
+6. **Expected:** `Bintang` tetap ada di tabel guru dan di daftar login; password `123` berhasil dipakai untuk masuk sebagai `Bintang`, dengan dashboard progres nol.
+
+### AC-14 — Seluruh data login hanya di `localStorage`
+1. Buka `users.js` dengan editor teks.
+2. **Expected:** file hanya berisi `window.SAINSKAN_USERS = []`; tidak ada `Guru Sains`, `Komet`, `Neutron`, `Orbit`, `Awan`, `Raksa`, `Supernova`, atau akun lain.
+3. Buka aplikasi, lalu periksa `localStorage` key `sainskan.progress.v2`.
+4. **Expected:** field `accounts` berisi 7 akun — 1 guru (`Guru Sains`) dan 6 siswa — lengkap dengan `username`, `password: '123'`, dan `role`; siswa juga punya `seed`.
+5. Keluar, muat ulang, lalu masuk sebagai `Guru Sains` / `123` dan sebagai `Komet` / `123`.
+6. **Expected:** keduanya berhasil login dan sesuai perannya, tanpa membaca akun dari `users.js`.
 
 ---
 
@@ -283,15 +368,19 @@ Relasi: `Kuis.materiId → Materi.id`; `Progres.pemainId → Pemain.id`; `Pemain
 | **3 — Dashboard & Harian** | Dashboard gamifikasi, progress bar per kategori, daily challenge lokal + streak, leaderboard demo, ringkasan pencapaian | Dashboard lengkap | AC-1, AC-6 lolos |
 | **4 — Simulasi** | Canvas gravitasi, tata surya, rangkaian; kontrol & label ilmiah; pencatatan `simulasiDicoba` | 3 simulasi interaktif | AC-7 lolos; badge penjelajah muncul |
 | **5 — Finishing** | Responsivitas, aksesibilitas, reduced-motion, reset, dokumentasi, uji manual AC-1…AC-10 | `index.html` final + `SPEC.md` | Semua AC lolos, tidak ada error konsol |
+| **6 — Akun & panel guru** | `users.js` dikosongkan, halaman login, sesi `localStorage`, `db.accounts` untuk seluruh akun (guru + siswa), `db.progress[username]`, migrasi v1→v2, panel guru + detail siswa + tambah siswa, isolasi peran | `users.js`, `index.html` v2, `SPEC.md` v1.1 | AC-1, AC-11, AC-12, AC-13, AC-14 lolos; progres tiap akun terpisah |
 
-**Urutan pengerjaan prototype:** Iterasi 0 → 5 dikerjakan dalam satu `index.html` agar dapat langsung dijalankan, dengan urutan logika yang sama seperti tabel di atas.
+**Urutan pengerjaan prototype:** Iterasi 0 → 6 dikerjakan dalam `index.html` + `users.js` agar dapat langsung dijalankan, dengan urutan logika yang sama seperti tabel di atas.
 
 ---
 
 ## 10. Catatan Implementasi Prototipe
 
-- Prototipe memakai **hash routing** (`#/dashboard`, `#/materi`, `#/materi/f1`, `#/kuis/f1`, `#/simulasi`, `#/pencapaian`, `#/leaderboard`) sehingga tombol Back browser berfungsi.
+- Prototipe memakai **hash routing** (`#/login`, `#/dashboard`, `#/materi`, `#/materi/f1`, `#/kuis/f1`, `#/simulasi`, `#/pencapaian`, `#/leaderboard`, `#/guru`) sehingga tombol Back browser berfungsi. Router memaksa halaman login jika belum ada sesi dan memaksa panel guru untuk akun guru.
 - Ilustrasi materi dibuat sebagai `data:image/svg+xml;charset=utf-8,...` dari fungsi generator; `imageUrl` tetap menjadi field data sesuai model.
 - Seluruh teks dinamis melalui helper `esc()` sebelum disisipkan ke template.
 - Simulasi memakai `requestAnimationFrame`; semua loop dihentikan pada `cleanup()` saat pindah halaman.
-- Tidak ada dependensi eksternal sama sekali (tidak ada font CDN, tidak ada library UI).
+- Tidak ada dependensi eksternal sama sekali (tidak ada font CDN, tidak ada library UI). Satu-satunya file lokal tambahan adalah `users.js`.
+- Kredensial tidak dimuat dengan `fetch()` karena browser memblokir `file://` CORS; `users.js` tetap dimuat lewat tag `<script src="./users.js">` meski isinya kosong, semua akun dibaca dari `localStorage`.
+- `users.js` berisi `window.SAINSKAN_USERS = []` — **tanpa akun guru maupun siswa**. Seluruh akun (guru + 6 siswa contoh + hasil tombol **Tambah siswa**) disimpan di `db.accounts` pada `localStorage` beserta `seed` progres siswa. `loadDB()` menggabungkan `BASE_ACCOUNTS` dari file dengan `db.accounts`; `DEFAULT_GURU` + `DEFAULT_SISWA` di `index.html` hanya bootstrap sekali saat penyimpanan kosong dan langsung ditulis oleh `saveDB()` saat inisialisasi.
+- Password `123` plaintext adalah keputusan prototype sesuai permintaan; lingkungan produksi harus memakai backend + hashing (bcrypt/Argon2) + HTTPS.
